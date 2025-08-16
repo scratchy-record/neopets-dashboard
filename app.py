@@ -217,7 +217,15 @@ with colD:
 gainers, decliners, volatile = top_tables(summary, top_n, title_filter, cat_filter, rarity_filter)
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 Top Movers", "📉 Top Decliners", "⚡ Highest Volatility", "📊 Line Chart", "🔔 Price Alerts"])
-
+with tab5:
+    st.subheader("Price Alerts (price_latest ≥ target_price)")
+    if alerts.empty:
+        st.info("No alerts. Add 'target_price' values in the summary_30d sheet, or adjust filters.")
+    else:
+        cols = ["item_name","link","price_earliest","price_latest","pct_change","target_price"]
+        # Only include columns that exist (robust if sheet is missing any)
+        cols = [c for c in cols if c in alerts.columns]
+        st.dataframe(alerts[cols].reset_index(drop=True))
 with tab1:
     st.subheader("Top Movers (All-time % change)")
     cols = ["item_name","item_id","item_category","rarity","price_earliest","price_latest","abs_change","pct_change","link"]
@@ -255,12 +263,3 @@ with tab4:
     )
     plot_lines(prices, select_ids)
     
-    with tab5:
-    st.subheader("Price Alerts (price_latest ≥ target_price)")
-    if alerts.empty:
-        st.info("No alerts. Add 'target_price' values in the summary_30d sheet, or adjust filters.")
-    else:
-        cols = ["item_name","link","price_earliest","price_latest","pct_change","target_price"]
-        # Only include columns that exist (robust if sheet is missing any)
-        cols = [c for c in cols if c in alerts.columns]
-        st.dataframe(alerts[cols].reset_index(drop=True))
