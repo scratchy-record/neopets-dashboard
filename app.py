@@ -254,6 +254,7 @@ with tab4:
         format_func=lambda k: label_map.get(k, str(k))
     )
     plot_lines(prices, select_ids)
+    
     with tab5:
     st.subheader("Price Alerts (price_latest ≥ target_price)")
     if alerts.empty:
