@@ -130,8 +130,10 @@ def apply_filters(df, title_filter, cat_filter, rarity_filter):
     return dfv
 
 # Build alerts from filtered summary
+
 summary_filtered = apply_filters(summary, title_filter, cat_filter, rarity_filter)
 alerts = summary_filtered.copy()
+
 if "target_price" in alerts.columns:
     alerts = alerts[alerts["target_price"].notna()]
     alerts = alerts[alerts["price_latest"].notna()]
@@ -254,4 +256,13 @@ with tab4:
         format_func=lambda k: label_map.get(k, str(k))
     )
     plot_lines(prices, select_ids)
-    
+
+with tab5:
+    st.subheader("Price Alerts (price_latest ≥ target_price)")
+    if alerts.empty:
+        st.info("No alerts. Add 'target_price' values in the summary_30d sheet, or adjust filters.")
+    else:
+        cols = ["item_name","link","price_earliest","price_latest","pct_change","target_price"]
+        # Only include columns that exist (robust if sheet is missing any)
+        cols = [c for c in cols if c in alerts.columns]
+        st.dataframe(alerts[cols].reset_index(drop=True))
