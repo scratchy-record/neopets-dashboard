@@ -4,6 +4,7 @@
 # - Filters by item title, category, rarity
 # - Shows Top Movers, Top Decliners, Highest Volatility
 # - Line chart for selected items
+# - NEW: Price Alerts tab (uses 'target_price' column in summary_30d)
 #
 # Install once:
 #   pip3 install streamlit pandas plotly requests python-dateutil
@@ -129,22 +130,7 @@ def apply_filters(df, title_filter, cat_filter, rarity_filter):
         dfv = dfv[dfv["rarity"].isin(rarity_filter)]
     return dfv
 
-# Build alerts from filtered summary
-
-summary_filtered = apply_filters(summary, title_filter, cat_filter, rarity_filter)
-alerts = summary_filtered.copy()
-
-if "target_price" in alerts.columns:
-    alerts = alerts[alerts["target_price"].notna()]
-    alerts = alerts[alerts["price_latest"].notna()]
-    alerts = alerts[alerts["price_latest"] >= alerts["target_price"]]
-    # Nice ordering: how far over target
-    alerts["over_target"] = alerts["price_latest"] - alerts["target_price"]
-    alerts = alerts.sort_values(["over_target","pct_change"], ascending=[False, False])
-else:
-    alerts = alerts.iloc[0:0]  # empty if no column in sheet
-
-def plot_lines(prices: pd.DataFrame, item_ids: list[int]):
+def plot_lines(prices: pd.DataFrame, item_ids):
     sub = prices[prices["item_id"].isin(item_ids)].dropna(subset=["run_date","current_price_np"]).copy()
     if sub.empty:
         st.info("No price data to plot for the current selection.")
@@ -215,10 +201,27 @@ with colC:
 with colD:
     top_n = st.slider("Top N", min_value=5, max_value=100, value=20, step=5)
 
-# ---------- Tables & Charts ----------
-gainers, decliners, volatile = top_tables(summary, top_n, title_filter, cat_filter, rarity_filter)
+# ---------- Build derived tables AFTER filters exist ----------
+summary_filtered = apply_filters(summary, title_filter, cat_filter, rarity_filter)
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 Top Movers", "📉 Top Decliners", "⚡ Highest Volatility", "📊 Line Chart", "🔔 Price Alerts"])
+# Price Alerts (requires 'target_price' column in summary_30d)
+alerts = summary_filtered.copy()
+if "target_price" in alerts.columns:
+    alerts = alerts[alerts["target_price"].notna()]
+    alerts = alerts[alerts["price_latest"].notna()]
+    alerts = alerts[alerts["price_latest"] >= alerts["target_price"]]
+    alerts["over_target"] = alerts["price_latest"] - alerts["target_price"]
+    alerts = alerts.sort_values(["over_target","pct_change"], ascending=[False, False])
+else:
+    alerts = alerts.iloc[0:0]
+
+# Top sections
+gainers, decliners, volatile = top_tables(summary_filtered, top_n)
+
+# ---------- Tabs ----------
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "📈 Top Movers", "📉 Top Decliners", "⚡ Highest Volatility", "📊 Line Chart", "🔔 Price Alerts"
+])
 
 with tab1:
     st.subheader("Top Movers (All-time % change)")
@@ -238,7 +241,7 @@ with tab3:
 with tab4:
     # Default to top 5 gainers
     default_ids = gainers["item_id"].head(5).dropna().astype(int).tolist()
-    # Choices filtered by current filters
+    # Choices come from the already-filtered summary; map to prices
     filtered_prices = prices.copy()
     if title_filter:
         q = title_filter.lower()
@@ -263,6 +266,5 @@ with tab5:
         st.info("No alerts. Add 'target_price' values in the summary_30d sheet, or adjust filters.")
     else:
         cols = ["item_name","link","price_earliest","price_latest","pct_change","target_price"]
-        # Only include columns that exist (robust if sheet is missing any)
         cols = [c for c in cols if c in alerts.columns]
         st.dataframe(alerts[cols].reset_index(drop=True))
